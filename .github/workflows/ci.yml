@@ -1,0 +1,25 @@
+name: Simple CI for Modern Bootstrap Demo
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  validate-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate HTML syntax
+        uses: Cyb3r-Jak/html5-validator-action@v1
+        with:
+          root: .
+
+      - name: Check for broken links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: '--verbose --no-progress index.html'
+          fail: true
