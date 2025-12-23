@@ -1,4 +1,4 @@
-name: Simple CI for Modern Bootstrap Demo
+name: Enhanced CI/CD for Bootstrap Landing Page Demo
 
 on:
   push:
@@ -7,21 +7,46 @@ on:
     branches: [ main, master ]
 
 jobs:
-  validate-and-check:
+  ci-checks:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Updated to correct repo name (common error source)
+      # Validate HTML5 syntax (strict quality gate)
       - name: Validate HTML syntax
-        uses: Cyb3r-Jak3/html5validator-action@v7.2.0  # Pinned to latest stable version
+        uses: Cyb3r-Jak3/html5validator-action@v7.2.0
         with:
           root: .
 
-      # Lychee link checker with relaxed settings to avoid CDN timeouts/false positives
+      # Check for broken links (with better handling for external resources)
       - name: Check for broken links
         uses: lycheeverse/lychee-action@v2
         with:
-          args: '--verbose --no-progress --max-concurrency 10 --timeout 30 index.html'
-          fail: false  # Set to false initially to see output without failing; change to true later
+          args: '--verbose --no-progress --max-concurrency 15 --timeout 45 --accept 200,301,302,403,429 index.html'
+          fail: true  # Now strict – fails on real broken links
+
+  deploy-to-pages:
+    needs: ci-checks  # Only deploy if CI checks pass
+    if: github.ref == 'refs/heads/main'  # Only on push to main (not PRs)
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write      # Required for deployment
+      id-token: write   # Required for authentication
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Upload the static site as artifact
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .  # Root folder – contains index.html directly
+
+      # Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
