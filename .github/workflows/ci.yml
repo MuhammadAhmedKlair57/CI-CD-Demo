@@ -1,52 +1,78 @@
-name: Enhanced CI/CD for Bootstrap Landing Page Demo
+name: CI/CD Showcase - Bootstrap Landing Page
 
+# Triggers the workflow on push/PR to main/master
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  # Allows manual trigger from GitHub UI (great for live demo)
+  workflow_dispatch:
+
+# Prevents multiple deployments running at once (clean demo)
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  ci-checks:
+  # ──────────────────────────────────────────────────────────────
+  # JOB 1: Quality Checks (CI phase)
+  # ──────────────────────────────────────────────────────────────
+  quality-checks:
+    name: Quality & Validation Checks
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # Validate HTML5 syntax (strict quality gate)
-      - name: Validate HTML syntax
+      # Validates HTML5 syntax (catches broken markup)
+      - name: 🔍 Validate HTML syntax
         uses: Cyb3r-Jak3/html5validator-action@v7.2.0
         with:
           root: .
 
-      # Check for broken links (with better handling for external resources)
-      - name: Check for broken links
+      # Checks broken links, images, CDNs etc.
+      - name: 🔗 Check for broken links & resources
         uses: lycheeverse/lychee-action@v2
         with:
-          args: '--verbose --no-progress --max-concurrency 15 --timeout 45 --accept 200,301,302,403,429 index.html'
-          fail: true  # Now strict – fails on real broken links
+          args: >-
+            --verbose
+            --no-progress
+            --max-concurrency 12
+            --timeout 40
+            --accept 200,301,302,403,429
+            index.html
+          fail: true   # Strict mode - fails job on broken resources
 
-  deploy-to-pages:
-    needs: ci-checks  # Only deploy if CI checks pass
-    if: github.ref == 'refs/heads/main'  # Only on push to main (not PRs)
+      # Optional: you can add more checks here later (e.g. accessibility, CSS lint)
+
+  # ──────────────────────────────────────────────────────────────
+  # JOB 2: Deployment (CD phase) - only on main branch push
+  # ──────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: quality-checks           # Only runs if CI passes
+    if: github.ref == 'refs/heads/main'   # Skip on PRs
     runs-on: ubuntu-latest
+
     permissions:
-      pages: write      # Required for deployment
-      id-token: write   # Required for authentication
+      pages: write
+      id-token: write
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - name: Checkout code
+      - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # Upload the static site as artifact
-      - name: Upload GitHub Pages artifact
+      - name: 🚀 Upload static content as artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .  # Root folder – contains index.html directly
+          path: .                     # Deploy everything in root (index.html + assets)
 
-      # Deploy to GitHub Pages
-      - name: Deploy to GitHub Pages
+      - name: 🌐 Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
